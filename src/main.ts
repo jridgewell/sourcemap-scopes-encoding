@@ -10,6 +10,7 @@ import { CODEC as ProposalCodec } from "./proposal/proposal.ts";
 import { CODEC as PrefixCodec } from "./prefix/prefix.ts";
 import { CODEC as PrefixUnsignedCodec } from "./prefix_unsigned/prefix_unsigned.ts";
 import { CODEC as RemainingCodec } from "./remaining/remaining.ts";
+import { CODEC as RemainingUnsignedCodec } from "./remaining_unsigned/remaining_unsigned.ts";
 import { CODEC as TagSplitCodec } from "./tag_split/tag_split.ts";
 import { CODEC as TagCombinedCodec } from "./tag_combined/tag_combined.ts";
 import { Codec, SourceMapJson } from "./types.ts";
@@ -58,6 +59,7 @@ if (import.meta.main) {
   }
   if (flags.remaining) {
     codecs.push(RemainingCodec);
+    codecs.push(RemainingUnsignedCodec);
   }
   if (flags["tag-split"]) {
     codecs.push(TagSplitCodec);
