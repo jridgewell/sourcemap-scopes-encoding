@@ -50,11 +50,13 @@ function encodeOriginalScope(
   builder.startOriginal(scope.start, scope.end, {
     kind: scope.kind,
     name: scope.name,
-    variables: scope.variables,
     isStackFrame: scope.isStackFrame,
     lastChildEnd: scope.children.at(-1)?.end,
   });
   (scope as any)[DEFINITION_SYMBOL] = builder.lastWrittenItemIdx;
+  if (scope.variables.length > 0) {
+    builder.variables(scope.variables);
+  }
 
   for (const child of scope.children) {
     encodeOriginalScope(child, builder);
@@ -69,10 +71,12 @@ function encodeGeneratedRange(
   const scope = range.originalScope as undefined | any;
   builder.startGenerated(range.start, range.end, {
     definition: scope?.[DEFINITION_SYMBOL],
-    bindings: range.values as (string | undefined)[],
     isStackFrame: range.isStackFrame,
     lastChildEnd: range.children.at(-1)?.end,
   });
+  if (range.values.length > 0) {
+    builder.bindings(range.values);
+  }
 
   for (const child of range.children) {
     encodeGeneratedRange(child, builder);
@@ -115,7 +119,6 @@ class Builder {
       name?: string;
       kind?: string;
       isStackFrame?: boolean;
-      variables?: string[];
       lastChildEnd?: { line: number; column: number };
     },
   ): this {
@@ -146,14 +149,6 @@ class Builder {
       ...nameIdxAndKindIdx,
     ];
 
-    if (options?.variables) {
-      const variables: MixedVlqList = options.variables.map((
-        variable,
-      ) => [this.#nameIdx(variable), "unsigned"]);
-      encodedNumbers.push([variables.length, "unsigned"]);
-      encodedNumbers.push(...variables);
-    }
-
     this.#encodedScope += encodeUnsignedVlq(Tag.ORIGINAL);
     this.#encodedScope += encodeUnsignedVlq(encodedNumbers.length);
     this.#encodedScope += encodeMixedVlqList(encodedNumbers);
@@ -169,6 +164,25 @@ class Builder {
     return this;
   }
 
+  variables(variables: string[]): this {
+    const encodedNumbers: MixedVlqList = [];
+
+    const vars: MixedVlqList = variables.map((
+      variable,
+    ) => [this.#nameIdx(variable), "unsigned"]);
+    encodedNumbers.push([variables.length, "unsigned"]);
+    encodedNumbers.push(...vars);
+
+    this.#encodedScope += encodeUnsignedVlq(Tag.VARIABLES);
+    this.#encodedScope += encodeUnsignedVlq(encodedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(encodedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.EMPTY);
+
+    this.#itemCounter++;
+
+    return this;
+  }
+
   startGenerated(
     start: { line: number; column: number },
     end: { line: number; column: number },
@@ -177,7 +191,6 @@ class Builder {
       isHidden?: boolean;
       definition?: number;
       callsite?: { sourceIdx: number; line: number; column: number };
-      bindings?: (string | undefined | BindingRange[])[];
       lastChildEnd?: { line: number; column: number };
     },
   ): this {
@@ -255,8 +268,20 @@ class Builder {
       this.#generatedState.callsiteColumn = column;
     }
 
-    emittedNumbers.push([options?.bindings?.length ?? 0, "unsigned"]);
-    for (const bindings of options?.bindings ?? []) {
+    this.#encodedScope += encodeUnsignedVlq(Tag.GENERATED);
+    this.#encodedScope += encodeUnsignedVlq(emittedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(emittedNumbers);
+
+    this.#itemCounter++;
+
+    return this;
+  }
+
+  bindings(bindingsArg: (string | undefined | BindingRange[])[]): this {
+    const emittedNumbers: MixedVlqList = [];
+
+    emittedNumbers.push([bindingsArg.length, "unsigned"]);
+    for (const bindings of bindingsArg) {
       if (bindings === undefined || typeof bindings === "string") {
         emittedNumbers.push(this.#nameIdx(bindings));
         continue;
@@ -264,14 +289,6 @@ class Builder {
 
       emittedNumbers.push(-bindings.length);
       emittedNumbers.push(this.#nameIdx(bindings[0].value));
-      if (
-        bindings[0].from.line !== start.line ||
-        bindings[0].from.column !== start.column
-      ) {
-        throw new Error(
-          "First binding line/column must match the range start line/column",
-        );
-      }
 
       for (let i = 1; i < bindings.length; ++i) {
         const { from: { line, column }, value } = bindings[i];
@@ -286,9 +303,10 @@ class Builder {
       }
     }
 
-    this.#encodedScope += encodeUnsignedVlq(Tag.GENERATED);
+    this.#encodedScope += encodeUnsignedVlq(Tag.BINDINGS);
     this.#encodedScope += encodeUnsignedVlq(emittedNumbers.length);
     this.#encodedScope += encodeMixedVlqList(emittedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.EMPTY);
 
     this.#itemCounter++;
 

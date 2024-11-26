@@ -9,7 +9,13 @@ import {
   ScopeInfo,
   SourceMapJson,
 } from "../types.ts";
-import { encodeMixedVlqList, encodeUnsignedVlq, encodeVlq, encodeVlqList, MixedVlqList } from "../vlq.ts";
+import {
+  encodeMixedVlqList,
+  encodeUnsignedVlq,
+  encodeVlq,
+  encodeVlqList,
+  MixedVlqList,
+} from "../vlq.ts";
 import { Tag } from "./types.ts";
 
 export function encode(
@@ -117,7 +123,7 @@ class Builder {
 
     if (options?.name) {
       flags |= 0x1;
-      nameIdxAndKindIdx.push([this.#nameIdx(options.name), 'unsigned']);
+      nameIdxAndKindIdx.push([this.#nameIdx(options.name), "unsigned"]);
     }
     if (options?.kind) {
       flags |= 0x2;
@@ -129,16 +135,16 @@ class Builder {
 
     const encodedNumbers: MixedVlqList = [
       lineDiff,
-      [column, 'unsigned'],
-      [flags, 'unsigned'],
+      [column, "unsigned"],
+      [flags, "unsigned"],
       ...nameIdxAndKindIdx,
     ];
 
     if (options?.variables) {
-      const variables: MixedVlqList = options.variables.map((variable) =>
-        [this.#nameIdx(variable), 'unsigned']
-      );
-      encodedNumbers.push([variables.length, 'unsigned']);
+      const variables: MixedVlqList = options.variables.map((
+        variable,
+      ) => [this.#nameIdx(variable), "unsigned"]);
+      encodedNumbers.push([variables.length, "unsigned"]);
       encodedNumbers.push(...variables);
     }
 
@@ -155,10 +161,10 @@ class Builder {
     const lineDiff = line - this.#originalState.line;
     this.#originalState.line = line;
     this.#encodedScope += encodeMixedVlqList([
-      [Tag.ORIGINAL_END, 'unsigned'],
-      [2, 'unsigned'],
+      [Tag.ORIGINAL_END, "unsigned"],
+      [2, "unsigned"],
       lineDiff,
-      [column, 'unsigned'],
+      [column, "unsigned"],
     ]);
     this.#itemCounter++;
 
@@ -202,7 +208,7 @@ class Builder {
     if (options?.isHidden) {
       flags |= 0x8;
     }
-    emittedNumbers.push([flags, 'unsigned']);
+    emittedNumbers.push([flags, "unsigned"]);
 
     if (options?.definition !== undefined) {
       emittedNumbers.push(options.definition - this.#generatedState.defIdx);
@@ -232,7 +238,7 @@ class Builder {
       this.#generatedState.callsiteColumn = column;
     }
 
-    emittedNumbers.push([options?.bindings?.length ?? 0, 'unsigned']);
+    emittedNumbers.push([options?.bindings?.length ?? 0, "unsigned"]);
     for (const bindings of options?.bindings ?? []) {
       if (bindings === undefined || typeof bindings === "string") {
         emittedNumbers.push(this.#nameIdx(bindings));

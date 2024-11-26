@@ -370,6 +370,56 @@ There is also the question of `START_LINE`, and `END_LINE` in `generated_item`.
 We could encode it's presence in FLAGS or use the LSB of the respective
 `*_COLUMN`.
 
+## Option E - Tag-Length-Value Variables
+
+This is a variant of Option D: Instead of including variables and bindings in
+`original_item` and `generated_item` respectively, we encode them in separate
+`variable` and `binding` items.
+
+```
+item =
+      "0x0"
+    | "0x1" LENGTH original_item
+    | "0x2" LENGTH generated_item
+    | "0x3" LENGTH variables
+    | "0x4" LENGTH bindings
+
+original_item =
+    START_LINE
+    START_COLUMN
+    END_LINE
+    END_COLUMN
+    FLAGS
+    NAME? // present if FLAGS<0> is set
+    KIND? // present if FLAGS<1> is set
+
+variables =
+    VARIABLE_COUNT
+    VARIABLE[VARIABLE_COUNT]
+
+generated_item =
+    START_COLUMN   // the actual value is START_COLUMN<1:n>.
+    START_LINE?    // present if START_COLUMN<0> is set.
+    END_COLUMN     // the actual value is END_COLUMN<1:n>.
+    END_LINE?      // present if END_COLUMN<0> is set.
+    FLAGS
+    DEFINITION_ITEM_OFFSET?    // present if FLAGS<0> is set
+    CALL_SITE_SOURCE?          // present if FLAGS<1> is set
+    CALL_SITE_LINE?            // present if FLAGS<1> is set
+    CALL_SITE_COLUMN?          // present if FLAGS<1> is set
+
+bindings =
+    BINDING_COUNT
+    binding[BINDING_COUNT]
+```
+
+Note that `variables` and `bindings` can't have child items. Nonetheless some
+tools may chose to add child items so it is required that generators "close"
+`variables` and `bindings` with an `EMPTY` tag.
+
+This could be improved by using the first bit of the tag to signal whether a tag
+has child items or not.
+
 ## Unsigned VLQ
 
 The current source map specification only allows for signed VLQ. This makes

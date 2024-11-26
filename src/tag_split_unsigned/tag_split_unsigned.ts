@@ -9,7 +9,8 @@ import { encode } from "../tag_split/encode.ts";
 
 export const CODEC: Codec = {
   name: "Tag-Value-Length Split (Option C, unsigned)",
-  description: "Prefix start/end items with a tag and their length. Use unsigned VLQ where appropriate.",
+  description:
+    "Prefix start/end items with a tag and their length. Use unsigned VLQ where appropriate.",
   encode: withUnsignedSupportEnabled(encode),
   decode: withUnsignedSupportEnabled(decode),
 };
