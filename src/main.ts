@@ -36,11 +36,15 @@ if (import.meta.main) {
       "tag-split",
       "tag-combined",
     ],
-    string: ["o"],
+    string: ["sizes"],
+    default: { "sizes": "scopes" },
   });
 
   if (flags._.length === 0) {
     throw new Error("Usage: main.ts [OPTIONS] FILES...");
+  }
+  if (flags.sizes !== "scopes" && flags.sizes !== "map") {
+    throw new Error("Valid values for 'sizes' are: 'scopes', 'map'");
   }
 
   const codecs: Codec[] = [];
@@ -59,6 +63,10 @@ if (import.meta.main) {
   if (flags["tag-combined"]) {
     codecs.push(TagCombinedCodec);
   }
+  const includedSourceMapProps: (keyof SourceMapJson)[] | undefined =
+    flags.sizes === "scopes"
+      ? ["originalScopes", "generatedRanges", "scopes"]
+      : undefined;
 
   dumpCodecsInfo(codecs);
 
@@ -67,13 +75,17 @@ if (import.meta.main) {
   for (const file of flags._) {
     const content = Deno.readTextFileSync(file.toString());
     const map = JSON.parse(content);
-    const baseSizes = calculateMapSizes(map);
+    const baseSizes = calculateMapSizes(map, undefined, includedSourceMapProps);
     const scopesInfo = ProposalCodec.decode(map);
 
     const codecSizes = codecs.map((codec) => {
       const newMap = codec.encode(scopesInfo, map);
       if (flags.verify) verifyCodec(codec, map, newMap);
-      const sizes = calculateMapSizes(newMap, baseSizes);
+      const sizes = calculateMapSizes(
+        newMap,
+        baseSizes,
+        includedSourceMapProps,
+      );
       return { Codec: codec.name, ...formatMapSizes(sizes) };
     });
 
@@ -137,15 +149,19 @@ interface MapSizes {
   deltaBrotli?: number;
 }
 
-function calculateMapSizes(map: SourceMapJson, base?: MapSizes): MapSizes {
+function calculateMapSizes(
+  map: SourceMapJson,
+  base: MapSizes | undefined,
+  props?: (keyof SourceMapJson)[],
+): MapSizes {
   const encoder = new TextEncoder();
-  const data = encoder.encode(
-    JSON.stringify({
-      os: map.originalScopes,
-      gr: map.generatedRanges,
-      s: map.scopes,
-    }),
-  );
+  const mapToStringify = props
+    ? props.reduce((obj, key) => {
+      obj[key] = map[key];
+      return obj;
+    }, {} as any)
+    : map;
+  const data = encoder.encode(JSON.stringify(mapToStringify));
   const gzipData = gzip(data);
   const brotliData = compress(data);
 
