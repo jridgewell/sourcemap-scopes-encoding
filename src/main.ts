@@ -63,7 +63,7 @@ if (import.meta.main) {
   if (flags["tag-combined"]) {
     codecs.push(TagCombinedCodec);
   }
-  const includedSourceMapProps: (keyof SourceMapJson)[] | undefined =
+  const filterSourceMapProps: (keyof SourceMapJson)[] | undefined =
     flags.sizes === "scopes"
       ? ["originalScopes", "generatedRanges", "scopes"]
       : undefined;
@@ -75,7 +75,7 @@ if (import.meta.main) {
   for (const file of flags._) {
     const content = Deno.readTextFileSync(file.toString());
     const map = JSON.parse(content);
-    const baseSizes = calculateMapSizes(map, undefined, includedSourceMapProps);
+    const baseSizes = calculateMapSizes(map, undefined, filterSourceMapProps);
     const scopesInfo = ProposalCodec.decode(map);
 
     const codecSizes = codecs.map((codec) => {
@@ -84,7 +84,7 @@ if (import.meta.main) {
       const sizes = calculateMapSizes(
         newMap,
         baseSizes,
-        includedSourceMapProps,
+        filterSourceMapProps,
       );
       return { Codec: codec.name, ...formatMapSizes(sizes) };
     });
