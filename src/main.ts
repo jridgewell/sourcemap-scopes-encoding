@@ -16,6 +16,7 @@ import { CODEC as TagSplitUnsignedCodec } from "./tag_split_unsigned/tag_split_u
 import { CODEC as TagCombinedCodec } from "./tag_combined/tag_combined.ts";
 import { CODEC as TagCombinedUnsignedCodec } from "./tag_combined_unsigned/tag_combined_unsigned.ts";
 import { CODEC as TagVariablesCodec } from "./tag_variables/tag_variables.ts";
+import { CODEC as TagVariablesUnsignedCodec } from "./tag_variables_unsigned/tag_variables_unsigned.ts";
 import { Codec, SourceMapJson } from "./types.ts";
 import { assertEquals } from "@std/assert";
 
@@ -75,6 +76,7 @@ if (import.meta.main) {
   }
   if (flags["tag-variables"]) {
     codecs.push(TagVariablesCodec);
+    codecs.push(TagVariablesUnsignedCodec);
   }
   const filterSourceMapProps: (keyof SourceMapJson)[] | undefined =
     flags.sizes === "scopes"
