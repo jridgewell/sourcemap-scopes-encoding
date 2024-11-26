@@ -217,14 +217,14 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
   };
 
   while (iter.hasNext()) {
-    const tag = iter.nextVLQ();
+    const tag = iter.nextUnsignedVLQ();
     if (tag === Tag.ORIGINAL) {
-      const _count = iter.nextVLQ();
+      const _count = iter.nextUnsignedVLQ();
       const [startLine, startColumn, endLine, endColumn] = [
         iter.nextVLQ(),
+        iter.nextUnsignedVLQ(),
         iter.nextVLQ(),
-        iter.nextVLQ(),
-        iter.nextVLQ(),
+        iter.nextUnsignedVLQ(),
       ];
 
       const startItem: Item = {
@@ -234,24 +234,24 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
         startColumn,
         endLine,
         endColumn,
-        flags: iter.nextVLQ(),
+        flags: iter.nextUnsignedVLQ(),
         variables: [],
       };
 
       if (startItem.flags & EncodedOriginalScopeFlag.HAS_NAME) {
-        startItem.name = iter.nextVLQ();
+        startItem.name = iter.nextUnsignedVLQ();
       }
       if (startItem.flags & EncodedOriginalScopeFlag.HAS_KIND) {
         startItem.kind = iter.nextVLQ();
       }
 
-      const variableCount = iter.nextVLQ();
+      const variableCount = iter.nextUnsignedVLQ();
       for (let i = 0; i < variableCount; ++i) {
-        startItem.variables.push(iter.nextVLQ());
+        startItem.variables.push(iter.nextUnsignedVLQ());
       }
       yield startItem;
     } else if (tag === Tag.GENERATED) {
-      const _count = iter.nextVLQ();
+      const _count = iter.nextUnsignedVLQ();
       const emittedStartColumn = iter.nextVLQ();
       const startLine = emittedStartColumn & 0x1 ? iter.nextVLQ() : 0;
 
@@ -264,7 +264,7 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
         startColumn: (emittedStartColumn >> 1),
         endLine,
         endColumn: (emittedEndColumn >> 1),
-        flags: iter.nextVLQ(),
+        flags: iter.nextUnsignedVLQ(),
         bindings: [],
       };
 
@@ -289,7 +289,7 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
         };
       }
 
-      const bindingsCount = iter.nextVLQ();
+      const bindingsCount = iter.nextUnsignedVLQ();
       for (let i = 0; i < bindingsCount; ++i) {
         const bindings: GeneratedItem["bindings"][number] = [];
         startItem.bindings.push(bindings);

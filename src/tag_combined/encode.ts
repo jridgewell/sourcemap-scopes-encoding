@@ -9,7 +9,7 @@ import {
   ScopeInfo,
   SourceMapJson,
 } from "../types.ts";
-import { encodeVlq, encodeVlqList } from "../vlq.ts";
+import { encodeMixedVlqList, encodeUnsignedVlq, encodeVlq, encodeVlqList, MixedVlqList } from "../vlq.ts";
 import { Tag } from "./types.ts";
 
 export function encode(
@@ -117,11 +117,11 @@ class Builder {
     this.#originalState.line = start.line;
     const endLineDelta = end.line - (options?.lastChildEnd?.line ?? start.line);
     let flags = 0;
-    const nameIdxAndKindIdx: number[] = [];
+    const nameIdxAndKindIdx: MixedVlqList = [];
 
     if (options?.name) {
       flags |= 0x1;
-      nameIdxAndKindIdx.push(this.#nameIdx(options.name));
+      nameIdxAndKindIdx.push([this.#nameIdx(options.name), 'unsigned']);
     }
     if (options?.kind) {
       flags |= 0x2;
@@ -131,26 +131,26 @@ class Builder {
       flags |= 0x4;
     }
 
-    const encodedNumbers: number[] = [
+    const encodedNumbers: MixedVlqList = [
       startLineDelta,
-      start.column,
+      [start.column, 'unsigned'],
       endLineDelta,
-      end.column,
-      flags,
+      [end.column, 'unsigned'],
+      [flags, 'unsigned'],
       ...nameIdxAndKindIdx,
     ];
 
     if (options?.variables) {
-      const variables = options.variables.map((variable) =>
-        this.#nameIdx(variable)
+      const variables: MixedVlqList = options.variables.map((variable) =>
+        [this.#nameIdx(variable), 'unsigned']
       );
-      encodedNumbers.push(variables.length);
+      encodedNumbers.push([variables.length, 'unsigned']);
       encodedNumbers.push(...variables);
     }
 
-    this.#encodedScope += encodeVlq(Tag.ORIGINAL);
-    this.#encodedScope += encodeVlq(encodedNumbers.length);
-    this.#encodedScope += encodeVlqList(encodedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.ORIGINAL);
+    this.#encodedScope += encodeUnsignedVlq(encodedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(encodedNumbers);
 
     this.#itemCounter++;
 
@@ -158,7 +158,7 @@ class Builder {
   }
 
   endOriginal(line: number): this {
-    this.#encodedScope += encodeVlq(Tag.EMPTY);
+    this.#encodedScope += encodeUnsignedVlq(Tag.EMPTY);
     this.#originalState.line = line;
     return this;
   }
@@ -175,7 +175,7 @@ class Builder {
       lastChildEnd?: { line: number; column: number };
     },
   ): this {
-    const emittedNumbers: number[] = [];
+    const emittedNumbers: MixedVlqList = [];
 
     const relativeLine = start.line - this.#generatedState.line;
     const relativeColumn = start.column -
@@ -219,7 +219,7 @@ class Builder {
     if (options?.isHidden) {
       flags |= 0x8;
     }
-    emittedNumbers.push(flags);
+    emittedNumbers.push([flags, 'unsigned']);
 
     if (options?.definition !== undefined) {
       emittedNumbers.push(options.definition - this.#generatedState.defIdx);
@@ -249,7 +249,7 @@ class Builder {
       this.#generatedState.callsiteColumn = column;
     }
 
-    emittedNumbers.push(options?.bindings?.length ?? 0);
+    emittedNumbers.push([options?.bindings?.length ?? 0, 'unsigned']);
     for (const bindings of options?.bindings ?? []) {
       if (bindings === undefined || typeof bindings === "string") {
         emittedNumbers.push(this.#nameIdx(bindings));
@@ -280,9 +280,9 @@ class Builder {
       }
     }
 
-    this.#encodedScope += encodeVlq(Tag.GENERATED);
-    this.#encodedScope += encodeVlq(emittedNumbers.length);
-    this.#encodedScope += encodeVlqList(emittedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.GENERATED);
+    this.#encodedScope += encodeUnsignedVlq(emittedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(emittedNumbers);
 
     this.#itemCounter++;
 
@@ -293,7 +293,7 @@ class Builder {
     this.#generatedState.line = line;
     this.#generatedState.column = column;
 
-    this.#encodedScope += encodeVlq(Tag.EMPTY);
+    this.#encodedScope += encodeUnsignedVlq(Tag.EMPTY);
 
     return this;
   }
