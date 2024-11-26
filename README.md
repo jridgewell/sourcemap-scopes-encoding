@@ -23,6 +23,9 @@ Options:
         --remaining    Include the "Remaining" encoding scheme (Option B)
         --tag-split    Include the "Tag Split" encoding scheme (Option C)
         --tag-combined Include the "Tag Combined" encoding scheme (Option D)
+        --sizes <arg>  How to calculate the sizes/deltas. Valid values are:
+                       "scopes" (default). Include only scopes related source map fields (without names, mappings).
+                       "map". Include the whole source map, including names, mappings and sources (content).
         --verify       Internal. Round-trip decode each encoding scheme and compare the result against the input codec.
 ```
 
