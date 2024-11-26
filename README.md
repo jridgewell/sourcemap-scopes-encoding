@@ -33,7 +33,8 @@ The examples are:
 ## Results
 
 ```
-deno -R src/main.ts --prefix --remaining --tag-split --tag-combined ./examples/simple.min.js.map ./examples/common.min.js.map ./examples/sdk.min.js.map ./examples/typescript.min.js.map
+deno task all
+Task all deno -R src/main.ts --prefix --remaining --tag-split --tag-combined ./examples/simple.min.js.map ./examples/common.min.js.map ./examples/sdk.min.js.map ./examples/typescript.min.js.map
 
 Name:         Proposal
 Description:  The currently proposed "Scopes" (stage 3) encoding
