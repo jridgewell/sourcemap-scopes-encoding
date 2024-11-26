@@ -7,7 +7,7 @@ import { decode } from "./decode.ts";
 import { encode } from "./encode.ts";
 
 export const CODEC: Codec = {
-  name: "Tag-Value-Length Combined (Option C2)",
+  name: "Tag-Value-Length Combined (Option D)",
   description:
     "Prefix original/generated items with a tag and their length. Combine start/end items.",
   encode,
