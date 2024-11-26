@@ -352,3 +352,15 @@ relative line/column numbers for start and end locations:
 There is also the question of `START_LINE`, and `END_LINE` in `generated_item`.
 We could encode it's presence in FLAGS or use the LSB of the respective
 `*_COLUMN`.
+
+## Unsigned VLQ
+
+The current source map specification only allows for signed VLQ. This makes
+sense for mappings where most fields are relative. The "Scopes" proposal
+includes various fields that can never be negative. As such it could be
+interesting to see the impact on the encoding scheme if unsigned VLQs are
+allowed.
+
+The tool includes support for unsigned VLQ and will output the result for each
+encoding scheme for both signed VLQ only, as well as using unsigned VLQ where
+possible.
