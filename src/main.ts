@@ -12,6 +12,7 @@ import { CODEC as PrefixUnsignedCodec } from "./prefix_unsigned/prefix_unsigned.
 import { CODEC as RemainingCodec } from "./remaining/remaining.ts";
 import { CODEC as RemainingUnsignedCodec } from "./remaining_unsigned/remaining_unsigned.ts";
 import { CODEC as TagSplitCodec } from "./tag_split/tag_split.ts";
+import { CODEC as TagSplitUnsignedCodec } from "./tag_split_unsigned/tag_split_unsigned.ts";
 import { CODEC as TagCombinedCodec } from "./tag_combined/tag_combined.ts";
 import { Codec, SourceMapJson } from "./types.ts";
 import { assertEquals } from "@std/assert";
@@ -63,6 +64,7 @@ if (import.meta.main) {
   }
   if (flags["tag-split"]) {
     codecs.push(TagSplitCodec);
+    codecs.push(TagSplitUnsignedCodec);
   }
   if (flags["tag-combined"]) {
     codecs.push(TagCombinedCodec);

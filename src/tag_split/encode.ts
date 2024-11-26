@@ -9,7 +9,7 @@ import {
   ScopeInfo,
   SourceMapJson,
 } from "../types.ts";
-import { encodeVlq, encodeVlqList } from "../vlq.ts";
+import { encodeMixedVlqList, encodeUnsignedVlq, encodeVlq, encodeVlqList, MixedVlqList } from "../vlq.ts";
 import { Tag } from "./types.ts";
 
 export function encode(
@@ -113,11 +113,11 @@ class Builder {
     const lineDiff = line - this.#originalState.line;
     this.#originalState.line = line;
     let flags = 0;
-    const nameIdxAndKindIdx: number[] = [];
+    const nameIdxAndKindIdx: MixedVlqList = [];
 
     if (options?.name) {
       flags |= 0x1;
-      nameIdxAndKindIdx.push(this.#nameIdx(options.name));
+      nameIdxAndKindIdx.push([this.#nameIdx(options.name), 'unsigned']);
     }
     if (options?.kind) {
       flags |= 0x2;
@@ -127,24 +127,24 @@ class Builder {
       flags |= 0x4;
     }
 
-    const encodedNumbers: number[] = [
+    const encodedNumbers: MixedVlqList = [
       lineDiff,
-      column,
-      flags,
+      [column, 'unsigned'],
+      [flags, 'unsigned'],
       ...nameIdxAndKindIdx,
     ];
 
     if (options?.variables) {
-      const variables = options.variables.map((variable) =>
-        this.#nameIdx(variable)
+      const variables: MixedVlqList = options.variables.map((variable) =>
+        [this.#nameIdx(variable), 'unsigned']
       );
-      encodedNumbers.push(variables.length);
+      encodedNumbers.push([variables.length, 'unsigned']);
       encodedNumbers.push(...variables);
     }
 
-    this.#encodedScope += encodeVlq(Tag.ORIGINAL_START);
-    this.#encodedScope += encodeVlq(encodedNumbers.length);
-    this.#encodedScope += encodeVlqList(encodedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.ORIGINAL_START);
+    this.#encodedScope += encodeUnsignedVlq(encodedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(encodedNumbers);
 
     this.#itemCounter++;
 
@@ -154,11 +154,11 @@ class Builder {
   endOriginal(line: number, column: number): this {
     const lineDiff = line - this.#originalState.line;
     this.#originalState.line = line;
-    this.#encodedScope += encodeVlqList([
-      Tag.ORIGINAL_END,
-      2,
+    this.#encodedScope += encodeMixedVlqList([
+      [Tag.ORIGINAL_END, 'unsigned'],
+      [2, 'unsigned'],
       lineDiff,
-      column,
+      [column, 'unsigned'],
     ]);
     this.#itemCounter++;
 
@@ -172,7 +172,7 @@ class Builder {
     callsite?: { sourceIdx: number; line: number; column: number };
     bindings?: (string | undefined | BindingRange[])[];
   }): this {
-    const emittedNumbers: number[] = [];
+    const emittedNumbers: MixedVlqList = [];
 
     const relativeLine = line - this.#generatedState.line;
     const relativeColumn = column -
@@ -202,7 +202,7 @@ class Builder {
     if (options?.isHidden) {
       flags |= 0x8;
     }
-    emittedNumbers.push(flags);
+    emittedNumbers.push([flags, 'unsigned']);
 
     if (options?.definition !== undefined) {
       emittedNumbers.push(options.definition - this.#generatedState.defIdx);
@@ -232,7 +232,7 @@ class Builder {
       this.#generatedState.callsiteColumn = column;
     }
 
-    emittedNumbers.push(options?.bindings?.length ?? 0);
+    emittedNumbers.push([options?.bindings?.length ?? 0, 'unsigned']);
     for (const bindings of options?.bindings ?? []) {
       if (bindings === undefined || typeof bindings === "string") {
         emittedNumbers.push(this.#nameIdx(bindings));
@@ -262,9 +262,9 @@ class Builder {
       }
     }
 
-    this.#encodedScope += encodeVlq(Tag.GENERATED_START);
-    this.#encodedScope += encodeVlq(emittedNumbers.length);
-    this.#encodedScope += encodeVlqList(emittedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.GENERATED_START);
+    this.#encodedScope += encodeUnsignedVlq(emittedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(emittedNumbers);
 
     this.#itemCounter++;
 
@@ -272,7 +272,7 @@ class Builder {
   }
 
   endGenerated(line: number, column: number): this {
-    const emittedNumbers: number[] = [];
+    const emittedNumbers: MixedVlqList = [];
 
     const relativeLine = line - this.#generatedState.line;
     const relativeColumn = column -
@@ -289,9 +289,9 @@ class Builder {
     this.#generatedState.line = line;
     this.#generatedState.column = column;
 
-    this.#encodedScope += encodeVlq(Tag.GENERATED_END);
-    this.#encodedScope += encodeVlq(emittedNumbers.length);
-    this.#encodedScope += encodeVlqList(emittedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(Tag.GENERATED_END);
+    this.#encodedScope += encodeUnsignedVlq(emittedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(emittedNumbers);
 
     this.#itemCounter++;
 

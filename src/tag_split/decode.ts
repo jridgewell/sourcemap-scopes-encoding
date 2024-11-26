@@ -188,34 +188,34 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
   };
 
   while (iter.hasNext()) {
-    const [tag, _count] = [iter.nextVLQ(), iter.nextVLQ()];
+    const [tag, _count] = [iter.nextUnsignedVLQ(), iter.nextUnsignedVLQ()];
     if (tag === Tag.ORIGINAL_START) {
-      const [line, column] = [iter.nextVLQ(), iter.nextVLQ()];
+      const [line, column] = [iter.nextVLQ(), iter.nextUnsignedVLQ()];
 
       const startItem: Item = {
         tag,
         index: itemCount,
         line,
         column,
-        flags: iter.nextVLQ(),
+        flags: iter.nextUnsignedVLQ(),
         variables: [],
       };
 
       if (startItem.flags & EncodedOriginalScopeFlag.HAS_NAME) {
-        startItem.name = iter.nextVLQ();
+        startItem.name = iter.nextUnsignedVLQ();
       }
       if (startItem.flags & EncodedOriginalScopeFlag.HAS_KIND) {
         startItem.kind = iter.nextVLQ();
       }
 
-      const variableCount = iter.nextVLQ();
+      const variableCount = iter.nextUnsignedVLQ();
       for (let i = 0; i < variableCount; ++i) {
-        startItem.variables.push(iter.nextVLQ());
+        startItem.variables.push(iter.nextUnsignedVLQ());
       }
 
       yield startItem;
     } else if (tag === Tag.ORIGINAL_END) {
-      const [line, column] = [iter.nextVLQ(), iter.nextVLQ()];
+      const [line, column] = [iter.nextVLQ(), iter.nextUnsignedVLQ()];
       yield { tag, line, column };
     } else if (tag === Tag.GENERATED_START) {
       const emittedColumn = iter.nextVLQ();
@@ -229,7 +229,7 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
         tag,
         line: generatedState.line,
         column: generatedState.column,
-        flags: iter.nextVLQ(),
+        flags: iter.nextUnsignedVLQ(),
         bindings: [],
       };
 
@@ -254,7 +254,7 @@ function* decodeScopeItem(encodedScopes: string): Generator<Item> {
         };
       }
 
-      const bindingsCount = iter.nextVLQ();
+      const bindingsCount = iter.nextUnsignedVLQ();
       for (let i = 0; i < bindingsCount; ++i) {
         const bindings: GeneratedStartItem["bindings"][number] = [];
         startItem.bindings.push(bindings);
