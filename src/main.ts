@@ -8,6 +8,7 @@ import { compress } from "https://deno.land/x/brotli/mod.ts";
 
 import { CODEC as ProposalCodec } from "./proposal/proposal.ts";
 import { CODEC as PrefixCodec } from "./prefix/prefix.ts";
+import { CODEC as PrefixUnsignedCodec } from "./prefix_unsigned/prefix_unsigned.ts";
 import { CODEC as RemainingCodec } from "./remaining/remaining.ts";
 import { CODEC as TagSplitCodec } from "./tag_split/tag_split.ts";
 import { CODEC as TagCombinedCodec } from "./tag_combined/tag_combined.ts";
@@ -53,6 +54,7 @@ if (import.meta.main) {
   }
   if (flags.prefix) {
     codecs.push(PrefixCodec);
+    codecs.push(PrefixUnsignedCodec);
   }
   if (flags.remaining) {
     codecs.push(RemainingCodec);

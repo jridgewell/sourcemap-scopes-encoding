@@ -16,6 +16,10 @@ const VLQ_CONTINUATION_MASK = 1 << 5;
 export function encodeVlq(n: number): string {
   // Set the sign bit as the least significant bit.
   n = n >= 0 ? 2 * n : 1 - 2 * n;
+  return encodeUnsignedVlq(n);
+}
+
+export function encodeUnsignedVlq(n: number): string {
   // Encode into a base64 run.
   let result = "";
   while (true) {
@@ -37,6 +41,21 @@ export function encodeVlq(n: number): string {
 
 export function encodeVlqList(list: number[]) {
   return list.map(encodeVlq).join("");
+}
+
+export type MixedVlqList = ([number, "signed" | "unsigned"] | number)[];
+
+export function encodeMixedVlqList(
+  list: MixedVlqList,
+): string {
+  return list.map((param) => {
+    if (typeof param === "number") {
+      return encodeVlq(param);
+    }
+    return param[1] === "signed"
+      ? encodeVlq(param[0])
+      : encodeUnsignedVlq(param[0]);
+  }).join("");
 }
 
 export class TokenIterator {
@@ -66,7 +85,15 @@ export class TokenIterator {
   }
 
   nextVLQ(): number {
-    // Read unsigned value.
+    let result = this.nextUnsignedVLQ();
+
+    // Fix the sign.
+    const negative = result & 1;
+    result >>= 1;
+    return negative ? -result : result;
+  }
+
+  nextUnsignedVLQ(): number {
     let result = 0;
     let shift = 0;
     let digit: number = VLQ_CONTINUATION_MASK;
@@ -86,11 +113,7 @@ export class TokenIterator {
       result += (digit & VLQ_BASE_MASK) << shift;
       shift += VLQ_BASE_SHIFT;
     }
-
-    // Fix the sign.
-    const negative = result & 1;
-    result >>= 1;
-    return negative ? -result : result;
+    return result;
   }
 
   /**
