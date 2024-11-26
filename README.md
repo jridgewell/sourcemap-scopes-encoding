@@ -1,10 +1,17 @@
 # Source Map "Scopes" encoding comparison
 
-This repository implements various ideas for encoding [source map scopes](https://github.com/tc39/source-map/blob/main/proposals/scopes.md). The goal is to evaluate different encoding schemes w.r.t. complexity, size and extensibility.
+This repository implements various ideas for encoding
+[source map scopes](https://github.com/tc39/source-map/blob/main/proposals/scopes.md).
+The goal is to evaluate different encoding schemes w.r.t. complexity, size and
+extensibility.
 
 ## Comparing different encoding schemes
 
-The repository includes a simple tool that compares the different encoding schemes against each other. It takes as input a list of source maps and a list of encoding schemes, and it spits out the size of the resulting source map (uncompressed, gzip, brotli). The input source maps require scope information in the format of the current proposal.
+The repository includes a simple tool that compares the different encoding
+schemes against each other. It takes as input a list of source maps and a list
+of encoding schemes, and it spits out the size of the resulting source map
+(uncompressed, gzip, brotli). The input source maps require scope information in
+the format of the current proposal.
 
 Usage:
 
@@ -21,14 +28,19 @@ Options:
 
 ## Source map examples
 
-The scope information in the `./examples` directory are obtained with a customized [terser](https://github.com/terser/terser). The customized terser supports basic function and block scopes, as well as variable renaming.
+The scope information in the `./examples` directory are obtained with a
+customized [terser](https://github.com/terser/terser). The customized terser
+supports basic function and block scopes, as well as variable renaming.
 
 The examples are:
 
-  * *simple.min.js.map*: Two tiny scripts with two simple functions.
-  * *common.min.js.map*: The `front_end/core/common` module the Chrome DevTools repository.
-  * *sdk.min.js.map*: The `front_end/core/sdk` module from the Chrome DevTools repository.
-  * *typescript.min.js.map*: The `lib/typescript.js` file from the tsc node module.
+- _simple.min.js.map_: Two tiny scripts with two simple functions.
+- _common.min.js.map_: The `front_end/core/common` module the Chrome DevTools
+  repository.
+- _sdk.min.js.map_: The `front_end/core/sdk` module from the Chrome DevTools
+  repository.
+- _typescript.min.js.map_: The `lib/typescript.js` file from the tsc node
+  module.
 
 ## Results
 
@@ -89,28 +101,38 @@ Description:  Prefix original/generated items with a tag and their length. Combi
 
 The current "Scopes" encoding is not ideal w.r.t. to future extension:
 
-* Adding new fields to `OriginalScope` and `GeneratedRange` in a backwards compatible way is impossible. Any tool implementing the current proposal would break once we add new optional fields to either data structure.
+- Adding new fields to `OriginalScope` and `GeneratedRange` in a backwards
+  compatible way is impossible. Any tool implementing the current proposal would
+  break once we add new optional fields to either data structure.
 
-* The encoding uses the `,` and `;` characters on top of base64 encoded VLQ numbers. Moving to a future binary source map format will require a different encoding for "Scopes" to account for `,` and `;`.
+- The encoding uses the `,` and `;` characters on top of base64 encoded VLQ
+  numbers. Moving to a future binary source map format will require a different
+  encoding for "Scopes" to account for `,` and `;`.
 
-We should aim for an encoding that is both forwards-compatible and is purely VLQ based: So the only difference between the current JSON source map format and a potential future binary format is how VLQs are encoded.
+We should aim for an encoding that is both forwards-compatible and is purely VLQ
+based: So the only difference between the current JSON source map format and a
+potential future binary format is how VLQs are encoded.
 
 The crux of the issue is to find the right balance between
 
-* retaining some flexibility for future extensions without going overboard (e.g DWARF-style encoding),
-* encoding/decoding complexity,
-* and encoded size.
+- retaining some flexibility for future extensions without going overboard (e.g
+  DWARF-style encoding),
+- encoding/decoding complexity,
+- and encoded size.
 
-This repository proposes some potential "Scopes" encodings that keep both goals in mind while aiming for a healthy balance.
+This repository proposes some potential "Scopes" encodings that keep both goals
+in mind while aiming for a healthy balance.
 
 ## Grammar
 
 The encoding formats are presented in a EBNF-like grammar with:
-* there is only one terminal: a VLQ. Each terminal is labelled and we denote them with uppercase (e.g. `TERMINAL` is a VLQ with the label 'TERMINAL').
-* non-terminals denoted with snake case (e.g. `non_term`).
-* `symbol*` means zero or more repetitions of `symbol`.
-* `symbol?` means zero or one `symbol`.
-* `symbol[N]` means N occurrences of `symbol`.
+
+- there is only one terminal: a VLQ. Each terminal is labelled and we denote
+  them with uppercase (e.g. `TERMINAL` is a VLQ with the label 'TERMINAL').
+- non-terminals denoted with snake case (e.g. `non_term`).
+- `symbol*` means zero or more repetitions of `symbol`.
+- `symbol?` means zero or one `symbol`.
+- `symbol[N]` means N occurrences of `symbol`.
 
 ## Option A - Prefix items with their length
 
@@ -164,17 +186,22 @@ generated_end_item =
 ```
 
 This is identical to the current proposal modulo:
-* Each item is prefixed with the number of VLQs in the item
-* Variables in `OriginalScope` and bindings in `GeneratedRange` are prefixed with their length
-* columns in the generated range encode whether a line VLQ is present or not
 
-`original_start_item` and `original_end_item` are distinguished by their length: A "end" item always has 2 VLQs while a "start" item has at least 3.
-`generated_start_item` and `generated_end_item` are distinguished by their length: A "end" item has 1 or 2 VLQs while a "start" item has at least 3.
+- Each item is prefixed with the number of VLQs in the item
+- Variables in `OriginalScope` and bindings in `GeneratedRange` are prefixed
+  with their length
+- columns in the generated range encode whether a line VLQ is present or not
 
+`original_start_item` and `original_end_item` are distinguished by their length:
+A "end" item always has 2 VLQs while a "start" item has at least 3.
+`generated_start_item` and `generated_end_item` are distinguished by their
+length: A "end" item has 1 or 2 VLQs while a "start" item has at least 3.
 
 ## Option B - Add "remaining" count in the presence of unknown flags
 
-To distinguish start/end items, we have to use an additional bit. For `original_*_item` we use a bit in `LINE` while for `generated_*_item` we use another bit in `COLUMN`.
+To distinguish start/end items, we have to use an additional bit. For
+`original_*_item` we use a bit in `LINE` while for `generated_*_item` we use
+another bit in `COLUMN`.
 
 We'll list only the changed productions w.r.t. to "Option A":
 
@@ -218,21 +245,29 @@ generated_end_item =
 ```
 
 Advantages over Option A:
-* We only pay the price of encoding the item length once we actually add new fields
-* Variables/bindings are not included, so REMAINING stays small even for scopes/ranges with lots of variables
+
+- We only pay the price of encoding the item length once we actually add new
+  fields
+- Variables/bindings are not included, so REMAINING stays small even for
+  scopes/ranges with lots of variables
 
 Quirks:
-* Adding new marker flags to FLAGS (not new fields) requires generators to emit a `REMAINING` value of 0.
 
+- Adding new marker flags to FLAGS (not new fields) requires generators to emit
+  a `REMAINING` value of 0.
 
 ## Option C - Tag-Length-Value
 
-Similar to Option A but we prefix each item not only with it's length but a tag as well. The advantages are:
+Similar to Option A but we prefix each item not only with it's length but a tag
+as well. The advantages are:
 
-* We can encode scopes and ranges in one blob. That is the JSON could have a single "scopes" field containing the combination of "originalScopes" and "generatedRanges".
-* Start/end items can be distinguished by their tag.
-* We keep the door open for not only extending `original_start_item` and `generated_start_item`, but adding new item types all-together.
-* `GeneratedRange.definition` only requires one index instead of two.
+- We can encode scopes and ranges in one blob. That is the JSON could have a
+  single "scopes" field containing the combination of "originalScopes" and
+  "generatedRanges".
+- Start/end items can be distinguished by their tag.
+- We keep the door open for not only extending `original_start_item` and
+  `generated_start_item`, but adding new item types all-together.
+- `GeneratedRange.definition` only requires one index instead of two.
 
 Since it's similar to option A, we'll list only the changed productions:
 
@@ -261,7 +296,10 @@ generated_start_item =
 
 ### Option C2 - DWARF-style zero entries
 
-This is a variant to Option C. Instead of using `original_start_item` and `original_end_item`, we combine both into a `original_item`. Similar to DWARF, nesting is achieved by using a special tag to denote the end of a item's children.
+This is a variant to Option C. Instead of using `original_start_item` and
+`original_end_item`, we combine both into a `original_item`. Similar to DWARF,
+nesting is achieved by using a special tag to denote the end of a item's
+children.
 
 ```
 item =
@@ -286,11 +324,17 @@ generated_item =
     // ....
 ```
 
-Example of nested scopes (tags only): `[0x1, ...<length + content>, 0x1, ...<length + content>, 0x0, 0x0]`.
+Example of nested scopes (tags only):
+`[0x1, ...<length + content>, 0x1, ...<length + content>, 0x0, 0x0]`.
 
-This comes with some special rules if we don't want to lose the efficiency of relative line/column numbers for start and end locations:
-* A scopes or ranges' start location is relative to the preceding siblings' end location, or the parents' start location if it's the first child.
-* A scopes or ranges' end location is relative to it's last child's end location, or it's start location if it does not have any children.
+This comes with some special rules if we don't want to lose the efficiency of
+relative line/column numbers for start and end locations:
 
-There is also the question of `START_LINE`, and `END_LINE` in `generated_item`. We could encode it's presence in FLAGS or use the LSB of the respective `*_COLUMN`.
+- A scopes or ranges' start location is relative to the preceding siblings' end
+  location, or the parents' start location if it's the first child.
+- A scopes or ranges' end location is relative to it's last child's end
+  location, or it's start location if it does not have any children.
 
+There is also the question of `START_LINE`, and `END_LINE` in `generated_item`.
+We could encode it's presence in FLAGS or use the LSB of the respective
+`*_COLUMN`.
