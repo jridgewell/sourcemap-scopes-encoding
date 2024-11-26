@@ -2,6 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/**
+ * If "unsigned support" is disabled, the "encodeUnsignedVlq", "encodeMixedVlqList" and
+ * TokenIterator.nextUnsignedVLQ functions, will still encode signed VLQs. This allows for
+ * easy comparison of signed-only/unsigned encoding schemes.
+ */
+let unsignedSupportEnabled = false;
+
+export function withUnsignedSupportEnabled<Args extends unknown[], Return>(
+  fn: (...args: Args) => Return,
+): (...args: Args) => Return {
+  return (...args: Args) => {
+    const backup = unsignedSupportEnabled;
+    unsignedSupportEnabled = true;
+    const result = fn(...args);
+    unsignedSupportEnabled = backup;
+    return result;
+  };
+}
+
+export function withUnsignedSupportDisabled<Args extends unknown[], Return>(
+  fn: (...args: Args) => Return,
+): (...args: Args) => Return {
+  return (...args: Args) => {
+    const backup = unsignedSupportEnabled;
+    unsignedSupportEnabled = false;
+    const result = fn(...args);
+    unsignedSupportEnabled = backup;
+    return result;
+  };
+}
+
 export const BASE64_CHARS =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 export const BASE64_CODES = new Uint8Array(123);
@@ -16,10 +47,14 @@ const VLQ_CONTINUATION_MASK = 1 << 5;
 export function encodeVlq(n: number): string {
   // Set the sign bit as the least significant bit.
   n = n >= 0 ? 2 * n : 1 - 2 * n;
-  return encodeUnsignedVlq(n);
+  return encodeUnsignedVlqInternal(n);
 }
 
 export function encodeUnsignedVlq(n: number): string {
+  return unsignedSupportEnabled ? encodeUnsignedVlqInternal(n) : encodeVlq(n);
+}
+
+function encodeUnsignedVlqInternal(n: number): string {
   // Encode into a base64 run.
   let result = "";
   while (true) {
@@ -85,7 +120,7 @@ export class TokenIterator {
   }
 
   nextVLQ(): number {
-    let result = this.nextUnsignedVLQ();
+    let result = this.#nextUnsignedVLQ();
 
     // Fix the sign.
     const negative = result & 1;
@@ -94,6 +129,10 @@ export class TokenIterator {
   }
 
   nextUnsignedVLQ(): number {
+    return unsignedSupportEnabled ? this.#nextUnsignedVLQ() : this.nextVLQ();
+  }
+
+  #nextUnsignedVLQ(): number {
     let result = 0;
     let shift = 0;
     let digit: number = VLQ_CONTINUATION_MASK;

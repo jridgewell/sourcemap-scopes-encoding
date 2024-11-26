@@ -128,7 +128,7 @@ function* decodeOriginalScopeItems(
   let itemCount = 0;
 
   while (iter.hasNext()) {
-    const [line, column] = [iter.nextVLQ(), iter.nextVLQ()];
+    const [line, column] = [iter.nextVLQ(), iter.nextUnsignedVLQ()];
 
     if ((line & 0x1) > 0) {
       yield [itemCount++, { line: line >> 1, column }];
@@ -138,20 +138,20 @@ function* decodeOriginalScopeItems(
     const startItem: EncodedOriginalScopeStart = {
       line: line >> 1,
       column,
-      flags: iter.nextVLQ(),
+      flags: iter.nextUnsignedVLQ(),
       variables: [],
     };
 
     if (startItem.flags & EncodedOriginalScopeFlag.HAS_NAME) {
-      startItem.name = iter.nextVLQ();
+      startItem.name = iter.nextUnsignedVLQ();
     }
     if (startItem.flags & EncodedOriginalScopeFlag.HAS_KIND) {
       startItem.kind = iter.nextVLQ();
     }
 
-    const variableCount = iter.nextVLQ();
+    const variableCount = iter.nextUnsignedVLQ();
     for (let i = 0; i < variableCount; ++i) {
-      startItem.variables.push(iter.nextVLQ());
+      startItem.variables.push(iter.nextUnsignedVLQ());
     }
 
     yield [itemCount++, startItem];
@@ -332,7 +332,7 @@ function* decodeGeneratedRangeItems(
     const startItem: EncodedGeneratedRangeStart = {
       line: state.line,
       column: state.column,
-      flags: iter.nextVLQ(),
+      flags: iter.nextUnsignedVLQ(),
       bindings: [],
     };
 
@@ -362,7 +362,7 @@ function* decodeGeneratedRangeItems(
       };
     }
 
-    const bindingsCount = iter.nextVLQ();
+    const bindingsCount = iter.nextUnsignedVLQ();
     for (let i = 0; i < bindingsCount; ++i) {
       const bindings: EncodedGeneratedRangeStart["bindings"][number] = [];
       startItem.bindings.push(bindings);

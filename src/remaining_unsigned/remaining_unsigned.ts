@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 import { Codec } from "../types.ts";
-import { decode } from "./decode.ts";
-import { encode } from "./encode.ts";
+import { decode } from "../remaining/decode.ts";
+import { encode } from "../remaining/encode.ts";
+import { withUnsignedSupportEnabled } from "../vlq.ts";
 
 export const CODEC: Codec = {
   name: "Remaining (Option B, unsigned)",
   description:
     'Add a "remaining VLQs count" to items for unknown flags. Use unsigned VLQ where appropriate.',
-  encode,
-  decode,
+  encode: withUnsignedSupportEnabled(encode),
+  decode: withUnsignedSupportEnabled(decode),
 };

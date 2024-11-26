@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 import { Codec } from "../types.ts";
-import { decode } from "./decode.ts";
-import { encode } from "./encode.ts";
+import { withUnsignedSupportEnabled } from "../vlq.ts";
+import { decode } from "../prefix/decode.ts";
+import { encode } from "../prefix/encode.ts";
 
 export const CODEC: Codec = {
   name: "Prefix (Option A, unsigned)",
   description:
     "Prefix start/end items with their length. Use unsigned VLQ where appropriate.",
-  encode,
-  decode,
+  encode: withUnsignedSupportEnabled(encode),
+  decode: withUnsignedSupportEnabled(decode),
 };

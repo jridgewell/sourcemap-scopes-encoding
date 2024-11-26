@@ -9,7 +9,13 @@ import {
   ScopeInfo,
   SourceMapJson,
 } from "../types.ts";
-import { encodeVlq, encodeVlqList } from "../vlq.ts";
+import {
+  encodeMixedVlqList,
+  encodeUnsignedVlq,
+  encodeVlq,
+  encodeVlqList,
+  MixedVlqList,
+} from "../vlq.ts";
 
 /**
  * Takes a SourceMap with "current proposal" scopes and re-encodes them using the "prefix" method.
@@ -112,37 +118,37 @@ export class OriginalScopeBuilder {
     const lineDiff = line - this.#lastLine;
     this.#lastLine = line;
     let flags = 0;
-    const nameIdxAndKindIdx: number[] = [];
+    const nameIdxAndKindIdx: MixedVlqList = [];
 
     if (options?.name) {
       flags |= 0x1;
-      nameIdxAndKindIdx.push(this.#nameIdx(options.name));
+      nameIdxAndKindIdx.push([this.#nameIdx(options.name), "unsigned"]);
     }
     if (options?.kind) {
       flags |= 0x2;
-      nameIdxAndKindIdx.push(this.#encodeKind(options?.kind));
+      nameIdxAndKindIdx.push([this.#encodeKind(options?.kind), "signed"]);
     }
     if (options?.isStackFrame) {
       flags |= 0x4;
     }
 
-    const encodedNumbers: number[] = [
-      lineDiff,
-      column,
-      flags,
+    const encodedNumbers: MixedVlqList = [
+      [lineDiff, "signed"],
+      [column, "unsigned"],
+      [flags, "unsigned"],
       ...nameIdxAndKindIdx,
     ];
 
     if (options?.variables) {
-      const variables = options.variables.map((variable) =>
-        this.#nameIdx(variable)
-      );
-      encodedNumbers.push(variables.length);
+      const variables: MixedVlqList = options.variables.map((
+        variable,
+      ) => [this.#nameIdx(variable), "unsigned"]);
+      encodedNumbers.push([variables.length, "unsigned"]);
       encodedNumbers.push(...variables);
     }
 
-    this.#encodedScope += encodeVlq(encodedNumbers.length);
-    this.#encodedScope += encodeVlqList(encodedNumbers);
+    this.#encodedScope += encodeUnsignedVlq(encodedNumbers.length);
+    this.#encodedScope += encodeMixedVlqList(encodedNumbers);
 
     this.#scopeCounter++;
 
@@ -152,7 +158,9 @@ export class OriginalScopeBuilder {
   end(line: number, column: number): this {
     const lineDiff = line - this.#lastLine;
     this.#lastLine = line;
-    this.#encodedScope += encodeVlqList([2, lineDiff, column]);
+    this.#encodedScope += encodeUnsignedVlq(2);
+    this.#encodedScope += encodeVlq(lineDiff);
+    this.#encodedScope += encodeUnsignedVlq(column);
     this.#scopeCounter++;
 
     return this;
@@ -208,7 +216,7 @@ export class GeneratedRangeBuilder {
     callsite?: { sourceIdx: number; line: number; column: number };
     bindings?: (string | undefined | BindingRange[])[];
   }): this {
-    const emittedNumbers: number[] = [];
+    const emittedNumbers: MixedVlqList = [];
 
     const relativeLine = line - this.#state.line;
     const relativeColumn = column -
@@ -238,7 +246,7 @@ export class GeneratedRangeBuilder {
     if (options?.isHidden) {
       flags |= 0x8;
     }
-    emittedNumbers.push(flags);
+    emittedNumbers.push([flags, "unsigned"]);
 
     if (options?.definition) {
       const { sourceIdx, scopeIdx } = options.definition;
@@ -273,7 +281,7 @@ export class GeneratedRangeBuilder {
       this.#state.callsiteColumn = column;
     }
 
-    emittedNumbers.push(options?.bindings?.length ?? 0);
+    emittedNumbers.push([options?.bindings?.length ?? 0, "unsigned"]);
     for (const bindings of options?.bindings ?? []) {
       if (bindings === undefined || typeof bindings === "string") {
         emittedNumbers.push(this.#nameIdx(bindings));
@@ -303,8 +311,8 @@ export class GeneratedRangeBuilder {
       }
     }
 
-    this.#encodedRange += encodeVlq(emittedNumbers.length);
-    this.#encodedRange += encodeVlqList(emittedNumbers);
+    this.#encodedRange += encodeUnsignedVlq(emittedNumbers.length);
+    this.#encodedRange += encodeMixedVlqList(emittedNumbers);
 
     return this;
   }
@@ -327,7 +335,7 @@ export class GeneratedRangeBuilder {
     this.#state.line = line;
     this.#state.column = column;
 
-    this.#encodedRange += encodeVlq(emittedNumbers.length);
+    this.#encodedRange += encodeUnsignedVlq(emittedNumbers.length);
     this.#encodedRange += encodeVlqList(emittedNumbers);
 
     return this;

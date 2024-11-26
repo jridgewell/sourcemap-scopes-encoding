@@ -125,16 +125,11 @@ function* decodeOriginalScopeItems(
   encodedOriginalScope: string,
 ): Generator<[number, EncodedOriginalScopeStart | EncodedOriginalScopeEnd]> {
   const iter = new TokenIterator(encodedOriginalScope);
-  let prevColumn = 0;
   let itemCount = 0;
 
   while (iter.hasNext()) {
-    const count = iter.nextVLQ();
-    const [line, column] = [iter.nextVLQ(), iter.nextVLQ()];
-    if (line === 0 && column < prevColumn) {
-      // throw new Error('Malformed original scope encoding: start/end items must be ordered w.r.t. source positions ' + column + ' ' + prevColumn);
-    }
-    prevColumn = column;
+    const count = iter.nextUnsignedVLQ();
+    const [line, column] = [iter.nextVLQ(), iter.nextUnsignedVLQ()];
 
     if (count === 2) {
       yield [itemCount++, { line, column }];
@@ -144,20 +139,20 @@ function* decodeOriginalScopeItems(
     const startItem: EncodedOriginalScopeStart = {
       line,
       column,
-      flags: iter.nextVLQ(),
+      flags: iter.nextUnsignedVLQ(),
       variables: [],
     };
 
     if (startItem.flags & EncodedOriginalScopeFlag.HAS_NAME) {
-      startItem.name = iter.nextVLQ();
+      startItem.name = iter.nextUnsignedVLQ();
     }
     if (startItem.flags & EncodedOriginalScopeFlag.HAS_KIND) {
       startItem.kind = iter.nextVLQ();
     }
 
-    const variableCount = iter.nextVLQ();
+    const variableCount = iter.nextUnsignedVLQ();
     for (let i = 0; i < variableCount; ++i) {
-      startItem.variables.push(iter.nextVLQ());
+      startItem.variables.push(iter.nextUnsignedVLQ());
     }
 
     yield [itemCount++, startItem];
@@ -325,7 +320,7 @@ function* decodeGeneratedRangeItems(
   };
 
   while (iter.hasNext()) {
-    const count = iter.nextVLQ();
+    const count = iter.nextUnsignedVLQ();
     const emittedColumn = iter.nextVLQ();
     const line = state.line + (emittedColumn & 0x1 ? iter.nextVLQ() : 0);
     state.column = (emittedColumn >> 1) +
@@ -339,7 +334,7 @@ function* decodeGeneratedRangeItems(
     const startItem: EncodedGeneratedRangeStart = {
       line: state.line,
       column: state.column,
-      flags: iter.nextVLQ(),
+      flags: iter.nextUnsignedVLQ(),
       bindings: [],
     };
 
@@ -369,7 +364,7 @@ function* decodeGeneratedRangeItems(
       };
     }
 
-    const bindingsCount = iter.nextVLQ();
+    const bindingsCount = iter.nextUnsignedVLQ();
     for (let i = 0; i < bindingsCount; ++i) {
       const bindings: EncodedGeneratedRangeStart["bindings"][number] = [];
       startItem.bindings.push(bindings);
