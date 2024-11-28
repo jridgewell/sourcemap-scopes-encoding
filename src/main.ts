@@ -71,7 +71,9 @@ if (import.meta.main) {
 
   const codecs: Codec[] = [];
   if (flags.proposal) {
-    codecs.push(ProposalCodec);
+    if (flags["sizes-reference"] !== "proposal") {
+      codecs.push(ProposalCodec);
+    }
     codecs.push(ProposalUnsignedCodec);
   }
   if (flags.prefix) {
