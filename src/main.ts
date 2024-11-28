@@ -12,6 +12,8 @@ import { CODEC as PrefixCodec } from "./prefix/prefix.ts";
 import { CODEC as PrefixUnsignedCodec } from "./prefix_unsigned/prefix_unsigned.ts";
 import { CODEC as RemainingCodec } from "./remaining/remaining.ts";
 import { CODEC as RemainingUnsignedCodec } from "./remaining_unsigned/remaining_unsigned.ts";
+import { CODEC as StripNamesCodec } from "./strip_names/strip_names.ts";
+import { CODEC as StripScopesCodec } from "./strip_scopes/strip_scopes.ts";
 import { CODEC as TagSplitCodec } from "./tag_split/tag_split.ts";
 import { CODEC as TagSplitUnsignedCodec } from "./tag_split_unsigned/tag_split_unsigned.ts";
 import { CODEC as TagCombinedCodec } from "./tag_combined/tag_combined.ts";
@@ -44,8 +46,8 @@ if (import.meta.main) {
       "tag-combined",
       "tag-variables",
     ],
-    string: ["sizes"],
-    default: { sizes: "scopes" },
+    string: ["sizes", "sizes-reference"],
+    default: { sizes: "scopes", "sizes-reference": "proposal" },
   });
 
   if (flags._.length === 0) {
@@ -54,9 +56,22 @@ if (import.meta.main) {
   if (flags.sizes !== "scopes" && flags.sizes !== "map") {
     throw new Error("Valid values for 'sizes' are: 'scopes', 'map'");
   }
+  if (
+    !["proposal", "no-scopes", "no-names"].includes(flags["sizes-reference"])
+  ) {
+    throw new Error(
+      "Valid values for 'sizes-reference' are: 'proposal', 'no-scopes', 'no-names'.",
+    );
+  }
+  if (flags.sizes === "scopes" && flags["sizes-reference"] !== "proposal") {
+    throw new Error(
+      `--sizes-reference="${flags["sizes-reference"]}" requires --sizes=map`,
+    );
+  }
 
   const codecs: Codec[] = [];
   if (flags.proposal) {
+    codecs.push(ProposalCodec);
     codecs.push(ProposalUnsignedCodec);
   }
   if (flags.prefix) {
@@ -84,25 +99,34 @@ if (import.meta.main) {
       ? ["originalScopes", "generatedRanges", "scopes"]
       : undefined;
 
-  dumpCodecsInfo(codecs);
+  const referenceCodec = flags["sizes-reference"] === "no-scopes"
+      ? StripScopesCodec
+      : flags["sizes-reference"] === "no-names"
+      ? StripNamesCodec
+      : ProposalCodec;
+  dumpCodecsInfo([referenceCodec, ...codecs]);
 
   const result: unknown[] = [];
 
   for (const file of flags._) {
     const content = Deno.readTextFileSync(file.toString());
-    const map = JSON.parse(content);
-    const baseSizes = calculateMapSizes(map, undefined, filterSourceMapProps);
-    const scopesInfo = ProposalCodec.decode(map);
+    const proposalMap = JSON.parse(content);
+    const scopesInfo = ProposalCodec.decode(proposalMap);
+
+    const referenceMap = flags["sizes-reference"] !== "proposal"
+        ? referenceCodec.encode(scopesInfo, proposalMap)
+        : proposalMap;
+    const baseSizes = calculateMapSizes(referenceMap, undefined, filterSourceMapProps);
 
     const codecSizes = codecs.map((codec) => {
-      const newMap = codec.encode(scopesInfo, map);
-      if (flags.verify) verifyCodec(codec, map, newMap);
+      const newMap = codec.encode(scopesInfo, referenceMap);
+      if (flags.verify) verifyCodec(codec, referenceMap, newMap);
       const sizes = calculateMapSizes(newMap, baseSizes, filterSourceMapProps);
       return { Codec: codec.name, ...formatMapSizes(sizes) };
     });
 
     result.push({ File: file });
-    result.push({ Codec: ProposalCodec.name, ...formatMapSizes(baseSizes) });
+    result.push({ Codec: referenceCodec.name, ...formatMapSizes(baseSizes) });
     result.push(...codecSizes);
     result.push({});
   }
@@ -120,7 +144,6 @@ if (import.meta.main) {
 }
 
 function dumpCodecsInfo(codecs: Codec[]) {
-  dumpCodecInfo(ProposalCodec);
   codecs.forEach(dumpCodecInfo);
 }
 

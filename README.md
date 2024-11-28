@@ -19,14 +19,26 @@ Usage:
 deno -R src/main.ts [OPTIONS] FILES...
 
 Options:
-        --prefix       Include the "Prefix" encoding scheme (Option A)
-        --remaining    Include the "Remaining" encoding scheme (Option B)
-        --tag-split    Include the "Tag Split" encoding scheme (Option C)
-        --tag-combined Include the "Tag Combined" encoding scheme (Option D)
-        --sizes <arg>  How to calculate the sizes/deltas. Valid values are:
-                       "scopes" (default). Include only scopes related source map fields (without names, mappings).
-                       "map". Include the whole source map, including names, mappings and sources (content).
-        --verify       Internal. Round-trip decode each encoding scheme and compare the result against the input codec.
+        --proposal              Include the "Proposal" encoding schemes
+        --prefix                Include the "Prefix" encoding scheme (Option A)
+        --remaining             Include the "Remaining" encoding scheme (Option B)
+        --tag-split             Include the "Tag Split" encoding scheme (Option C)
+        --tag-combined          Include the "Tag Combined" encoding scheme (Option D)
+        --sizes <arg>           How to calculate the sizes/deltas. Valid values are:
+                                "scopes" (default). Include only scopes related source map fields (without names, mappings).
+                                "map". Include the whole source map, including names, mappings and sources (content).
+        --sizes-reference <arg> The baseline for the delta calculation. Useful to estimate the
+                                size impact of the encoding schemes in general relative to source
+                                maps with/without "names" mappings.
+                                Valid values are:
+                                "proposal" (default). Compare against the input source map with
+                                    the "proposal" encoding scheme.
+                                "no-scopes". Only valid with "--sizes=map". Compare against the
+                                    input source map without scopes related fields.
+                                "no-names". Only valid with "--sizes=map". Compare against the
+                                    input source map without scopes related fields and "names"
+                                    stripped from mappings.
+        --verify                Internal. Round-trip decode each encoding scheme and compare the result against the input codec.
 ```
 
 ## Source map examples
