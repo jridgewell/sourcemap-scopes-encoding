@@ -11,6 +11,19 @@ import {
 } from "../types.ts";
 import { encodeVlq, encodeMixedVlqList } from "../vlq.ts";
 
+function octets(n: number, signed: boolean = false) {
+  if (signed) n = n < 0 ? (-n << 1) | 1 : n << 1;
+  const bits = 32 - Math.clz32(n);
+  if (bits === 0) return 0;
+  if (bits <= 5) return 1;
+  if (bits <= 10) return 2;
+  if (bits <= 15) return 3;
+  if (bits <= 20) return 4;
+  if (bits <= 25) return 5;
+  if (bits <= 30) return 6;
+  return 7;
+}
+
 /**
  * Takes a SourceMap with "current proposal" scopes and re-encodes them using the "prefix" method.
  */
@@ -28,12 +41,14 @@ export function encode(
   const encodedScopes = info.scopes.map((scope) => {
     const builder = new OriginalScopeBuilder(names);
     encodeOriginalScope(scope, builder, sourceIdx++);
+    builder.octets();
     return builder.build();
   });
 
   const builder = new GeneratedRangeBuilder(names);
   info.ranges.forEach((range) => encodeGeneratedRange(range, builder));
   const encodedRanges = builder.build();
+  builder.octets()
 
   map.originalScopes = encodedScopes;
   map.generatedRanges = encodedRanges;
@@ -88,6 +103,28 @@ export class OriginalScopeBuilder {
   #lastKind = 0;
   #scopeCounter = 0;
 
+  #bits: {
+    startLine: Uint32Array,
+    startCol: Uint32Array,
+    endLine: Uint32Array,
+    endCol: Uint32Array,
+    flags: Uint32Array,
+    names: Uint32Array,
+    kind: Uint32Array,
+    variableLength: Uint32Array,
+    variable: Uint32Array,
+  } = {
+    startLine: new Uint32Array(8),
+    startCol: new Uint32Array(8),
+    endLine: new Uint32Array(8),
+    endCol: new Uint32Array(8),
+    flags: new Uint32Array(8),
+    names: new Uint32Array(8),
+    kind: new Uint32Array(8),
+    variableLength: new Uint32Array(8),
+    variable: new Uint32Array(8),
+  };
+
   readonly #names: string[];
 
   /** The 'names' field of the SourceMap. The builder will modify it. */
@@ -120,15 +157,22 @@ export class OriginalScopeBuilder {
 
     if (options?.name) {
       flags |= 0x1;
-      nameIdxAndKindIdx.push(this.#nameIdx(options.name));
+      const n = this.#nameIdx(options.name);
+      this.#bits.names[octets(n)]++;
+      nameIdxAndKindIdx.push(n);
     }
     if (options?.kind) {
       flags |= 0x2;
-      nameIdxAndKindIdx.push(this.#encodeKind(options?.kind));
+      const k = this.#encodeKind(options?.kind);
+      this.#bits.kind[octets(k, true)]++;
+      nameIdxAndKindIdx.push(k);
     }
     if (options?.isStackFrame) {
       flags |= 0x4;
     }
+    this.#bits.flags[octets(flags)]++;
+    this.#bits.startLine[octets(lineDiff)]++;
+    this.#bits.startCol[octets(column)]++;
 
     this.#encodedScope += encodeMixedVlqList([
       [lineDiff, "unsigned"],
@@ -137,9 +181,14 @@ export class OriginalScopeBuilder {
       ...nameIdxAndKindIdx,
     ]);
 
+    this.#bits.variableLength[octets(options?.variables?.length ?? 0)]++;
     if (options?.variables) {
       this.#encodedScope += encodeMixedVlqList(
-        options.variables.map((variable) => this.#nameIdx(variable)),
+        options.variables.map((variable) => {
+          const n = this.#nameIdx(variable)
+          this.#bits.variable[octets(n)]++;
+          return n;
+        }),
       );
     }
 
@@ -155,6 +204,8 @@ export class OriginalScopeBuilder {
 
     const lineDiff = line - this.#lastLine;
     this.#lastLine = line;
+    this.#bits.endLine[octets(lineDiff)]++;
+    this.#bits.endCol[octets(column)]++;
     this.#encodedScope += encodeMixedVlqList([
       [lineDiff, "unsigned"],
       [column, "unsigned"],
@@ -162,6 +213,12 @@ export class OriginalScopeBuilder {
     this.#scopeCounter++;
 
     return this;
+  }
+
+  octets() {
+    console.log(Object.fromEntries(Object.entries(this.#bits).map(e => {
+      return [e[0], Object.fromEntries(e[1].entries().filter(e => e[1] > 0))]
+    })));
   }
 
   build(): string {
@@ -200,6 +257,34 @@ export class GeneratedRangeBuilder {
     callsiteColumn: 0,
   };
 
+  #bits: {
+    startLine: Uint32Array,
+    startCol: Uint32Array,
+    endLine: Uint32Array,
+    endCol: Uint32Array,
+    flags: Uint32Array,
+    names: Uint32Array,
+    kind: Uint32Array,
+    variableLength: Uint32Array,
+    variable: Uint32Array,
+  } = {
+    startLine: new Uint32Array(8),
+    startCol: new Uint32Array(8),
+    endLine: new Uint32Array(8),
+    endCol: new Uint32Array(8),
+    flags: new Uint32Array(8),
+    defSourceIdx: new Uint32Array(8),
+    defScopeIdx: new Uint32Array(8),
+    callSourceIdx: new Uint32Array(8),
+    callLine: new Uint32Array(8),
+    callCol: new Uint32Array(8),
+    bindingsLength: new Uint32Array(8),
+    binding: new Uint32Array(8),
+    bindingLength: new Uint32Array(8),
+    bindingLine: new Uint32Array(8),
+    bindingCol: new Uint32Array(8),
+  };
+
   readonly #names: string[];
 
   /** The 'names' field of the SourceMap. The builder will modify it. */
@@ -223,6 +308,11 @@ export class GeneratedRangeBuilder {
       [emittedColumn, "unsigned"],
     ]);
 
+
+    const diff = line - this.#state.line;
+    this.#bits.startLine[octets(diff)]++;
+    this.#bits.startCol[octets(emittedColumn)]++;
+
     this.#state.line = line;
     this.#state.column = column;
 
@@ -242,6 +332,7 @@ export class GeneratedRangeBuilder {
     this.#encodedRange += encodeMixedVlqList([
       [flags, "unsigned"],
     ]);
+    this.#bits.flags[octets(flags)]++;
 
     if (options?.definition) {
       const { sourceIdx, scopeIdx } = options.definition;
@@ -251,6 +342,8 @@ export class GeneratedRangeBuilder {
         (this.#state.defSourceIdx === sourceIdx ? this.#state.defScopeIdx : 0);
       this.#encodedRange += encodeVlq(emittedScopeIdx);
 
+      this.#bits.defSourceIdx[octets(sourceIdx, true)]++;
+      this.#bits.defScopeIdx[octets(scopeIdx, true)]++;
       this.#state.defSourceIdx = sourceIdx;
       this.#state.defScopeIdx = scopeIdx;
     }
@@ -271,19 +364,28 @@ export class GeneratedRangeBuilder {
         (this.#state.callsiteLine === line ? this.#state.callsiteColumn : 0);
       this.#encodedRange += encodeVlq(emittedColumn);
 
+      this.#bits.callSourceIdx[octets(sourceIdx, true)]++;
+      this.#bits.callLine[octets(line, true)]++;
+      this.#bits.callCol[octets(column, true)]++;
       this.#state.callsiteSourceIdx = sourceIdx;
       this.#state.callsiteLine = line;
       this.#state.callsiteColumn = column;
     }
 
+    this.#bits.bindingsLength[octets(options?.bindings?.length ?? 0)]++;
     for (const bindings of options?.bindings ?? []) {
       if (bindings === undefined || typeof bindings === "string") {
-        this.#encodedRange += encodeVlq(this.#nameIdx(bindings));
+        const n = this.#nameIdx(bindings);
+        this.#bits.binding[octets(n, true)]++;
+        this.#encodedRange += encodeVlq(n);
         continue;
       }
 
+      this.#bits.bindingLength[octets(-bindings.length, true)]++;
       this.#encodedRange += encodeVlq(-bindings.length);
-      this.#encodedRange += encodeVlq(this.#nameIdx(bindings[0].value));
+      const n = this.#nameIdx(bindings[0].value);
+      this.#bits.binding[octets(n, true)]++;
+      this.#encodedRange += encodeVlq(n);
       if (
         bindings[0].from.line !== line || bindings[0].from.column !== column
       ) {
@@ -301,7 +403,11 @@ export class GeneratedRangeBuilder {
             : 0);
         this.#encodedRange += encodeVlq(emittedLine);
         this.#encodedRange += encodeVlq(emittedColumn);
-        this.#encodedRange += encodeVlq(this.#nameIdx(value));
+        const n = this.#nameIdx(value);
+        this.#encodedRange += encodeVlq(n);
+        this.#bits.binding[octets(n, true)]++;
+        this.#bits.bindingLine[octets(emittedLine, true)]++;
+        this.#bits.bindingCol[octets(emittedColumn, true)]++;
       }
     }
 
@@ -317,6 +423,10 @@ export class GeneratedRangeBuilder {
     this.#encodedRange += encodeMixedVlqList([
       [emittedColumn, "unsigned"],
     ]);
+
+    const diff = line - this.#state.line;
+    this.#bits.endLine[octets(diff)]++;
+    this.#bits.endCol[octets(emittedColumn)]++;
 
     this.#state.line = line;
     this.#state.column = column;
@@ -350,6 +460,12 @@ export class GeneratedRangeBuilder {
       this.#names.push(name);
     }
     return idx;
+  }
+
+  octets() {
+    console.log(Object.fromEntries(Object.entries(this.#bits).map(e => {
+      return [e[0], Object.fromEntries(e[1].entries().filter(e => e[1] > 0))]
+    })));
   }
 
   build(): string {
